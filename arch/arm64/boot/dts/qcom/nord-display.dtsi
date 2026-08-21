@@ -1,0 +1,726 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2026 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * MDSS/DPU display fragment for SA8797P (Nordschleife) — IQ10/Ride M2 bringup.
+ *
+ * Hardware facts sourced from IPCAT nordschleife_2.0 (chip ID 781).
+ *
+ * FIXME(display_bringup) markers indicate values that are structurally
+ * correct but not yet confirmed against a live Nord register map or
+ * an authorised hardware specification for this chip:
+ *   SMMU_SID  — SMMU stream IDs for MDSS_0/MDSS_1
+ *   DP_PHY    — eDP PHY base addresses inside each MDSS wrapper
+ *   ICC       — Interconnect fabric node labels (mmss_noc/mc_virt/config_noc
+ *               not yet authored in nord.dtsi)
+ *   RPMHPD   — rpmhpd power domain phandle not yet in nord.dtsi
+ *   MDP_OPP   — MDP OPP frequencies are reused from sa8775p pending
+ *               Nord-specific perf-team sign-off
+ *
+ * Confirmed from IPCAT / dt-binding headers already in-tree:
+ *   MDSS_0 wrapper: 0xAE00000  GIC SPI 468
+ *   MDSS_1 wrapper: 0x8C00000  GIC SPI 962
+ *   MDSS_0 MDP:     0xAE01000  VBIF: 0xAEB0000
+ *   MDSS_1 MDP:     0x8C01000  VBIF: 0x8CB0000
+ *   dispcc0:        0xAF00000
+ *   dispcc1:        0x8CF0000
+ *   DPTX0–3 (MDSS_0): 0xAF54000/5C000/64000/6C000
+ *   DPTX0–3 (MDSS_1): 0x8D54000/5C000/64000/6C000
+ */
+
+#include <dt-bindings/clock/qcom,nord-dispcc.h>
+#include <dt-bindings/interconnect/qcom,nord-rpmh.h>
+#include <dt-bindings/power/qcom-rpmpd.h>
+
+/ {
+	/*
+	 * MDSS_0: primary display subsystem.
+	 *
+	 * Interrupt GIC SPI 468 confirmed from IPCAT nordschleife_2.0 interrupt
+	 * map (nordschleife_v2.0_p3q3r85_MTO, id 3711).
+	 */
+	mdss0: display-subsystem@ae00000 {
+		compatible = "qcom,nord-mdss";
+		reg = <0x0 0x0ae00000 0x0 0x1000>;
+		reg-names = "mdss";
+
+		interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+
+		/*
+		 * FIXME(ICC): mmss_noc / mc_virt / config_noc fabric nodes
+		 * have not yet been authored in nord.dtsi; replace placeholder
+		 * phandles once those nodes land.
+		 */
+		interconnects =
+			/* FIXME(ICC) */ <&mmss_noc MASTER_MDP0 QCOM_ICC_TAG_ALWAYS
+					  &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>,
+			/* FIXME(ICC) */ <&mmss_noc MASTER_MDP1 QCOM_ICC_TAG_ALWAYS
+					  &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>,
+			/* FIXME(ICC) */ <&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
+					  &config_noc SLAVE_DISPLAY_CFG QCOM_ICC_TAG_ACTIVE_ONLY>;
+		interconnect-names = "mdp0-mem", "mdp1-mem", "cpu-cfg";
+
+		resets = <&dispcc0 MDSS_DISP_CC_MDSS_CORE_BCR>;
+
+		power-domains = <&dispcc0 MDSS_DISP_CC_MDSS_CORE_GDSC>;
+
+		clocks = <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+			 /* FIXME(ICC): GCC_DISP_HF_AXI_CLK absent from nord-gcc.h;
+			  * confirm whether MDSS_0 AXI path is gated elsewhere. */
+			 <&dispcc0 MDSS_DISP_CC_MDSS_MDP_CLK>;
+		clock-names = "iface", "core";
+
+		/* FIXME(SMMU_SID): MDSS_0 SMMU stream ID not confirmed from
+		 * IPCAT aperture granules for Nord (confirmed=false). Replace
+		 * with validated SID before upstreaming. */
+		iommus = <&apps_smmu_0 0xffff 0x2>;	/* FIXME(SMMU_SID) */
+
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		status = "disabled";
+
+		mdss0_mdp: display-controller@ae01000 {
+			compatible = "qcom,nord-dpu";
+			/*
+			 * reg[0]: MDP registers, 0x8F000 bytes confirmed from
+			 *         IPCAT (MDSS_0_MDP at 0xAE01000).
+			 * reg[1]: VBIF, 0x3000 bytes (pattern from sa8775p).
+			 */
+			reg = <0x0 0x0ae01000 0x0 0x8f000>,
+			      <0x0 0x0aeb0000 0x0 0x3000>;
+			reg-names = "mdp", "vbif";
+
+			interrupt-parent = <&mdss0>;
+			interrupts = <0>;
+
+			clocks = <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_MDP_LUT_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_MDP_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_VSYNC_CLK>;
+			clock-names = "iface", "lut", "core", "vsync";
+
+			assigned-clocks = <&dispcc0 MDSS_DISP_CC_MDSS_VSYNC_CLK>;
+			assigned-clock-rates = <19200000>;
+
+			/*
+			 * FIXME(MDP_OPP): OPP table frequencies reused from
+			 * sa8775p pending Nord perf-team sign-off.
+			 */
+			operating-points-v2 = <&mdss0_mdp_opp_table>;
+
+			/* FIXME(RPMHPD): rpmhpd node not yet in nord.dtsi. */
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/* intf_0: DP0 SST → DPTX_0 */
+				port@0 {
+					reg = <0>;
+					dpu0_intf0_out: endpoint {
+						remote-endpoint = <&mdss0_dp0_in>;
+					};
+				};
+
+				/* intf_4: DP1 SST → DPTX_1 */
+				port@4 {
+					reg = <4>;
+					dpu0_intf4_out: endpoint {
+						remote-endpoint = <&mdss0_dp1_in>;
+					};
+				};
+
+				/*
+				 * MST ports (intf_3/6/7 for DP0 MST, intf_8/9/10
+				 * for DP1 MST) are out of M2 bring-up scope; add
+				 * once MST driver support is confirmed.
+				 */
+			};
+
+			mdss0_mdp_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-162000000 {
+					opp-hz = /bits/ 64 <162000000>;
+					required-opps = <&rpmhpd_opp_low_svs>;
+				};
+
+				opp-270000000 {
+					opp-hz = /bits/ 64 <270000000>;
+					required-opps = <&rpmhpd_opp_svs>;
+				};
+
+				opp-540000000 {
+					opp-hz = /bits/ 64 <540000000>;
+					required-opps = <&rpmhpd_opp_svs_l1>;
+				};
+
+				opp-810000000 {
+					opp-hz = /bits/ 64 <810000000>;
+					required-opps = <&rpmhpd_opp_nom>;
+				};
+			};
+		};
+
+		/*
+		 * FIXME(DP_PHY): eDP PHY base addresses for MDSS_0 are not
+		 * confirmed from IPCAT nordschleife_2.0 aperture granules
+		 * (confirmed=false for all MDSS regions).  The addresses below
+		 * follow the sa8775p offset pattern (MDSS_base + 0xC2A00 and
+		 * MDSS_base + 0xC5A00) as a structural placeholder.
+		 */
+		mdss0_dp0_phy: phy@aec2a00 {		/* FIXME(DP_PHY) */
+			compatible = "qcom,nord-edp-phy";
+			reg = <0x0 0x0aec2a00 0x0 0x200>,
+			      <0x0 0x0aec2200 0x0 0x0d0>,
+			      <0x0 0x0aec2600 0x0 0x0d0>,
+			      <0x0 0x0aec2000 0x0 0x1c8>;
+
+			clocks = <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>;
+			clock-names = "aux", "cfg_ahb";
+
+			#clock-cells = <1>;
+			#phy-cells = <0>;
+
+			status = "disabled";
+		};
+
+		mdss0_dp1_phy: phy@aec5a00 {		/* FIXME(DP_PHY) */
+			compatible = "qcom,nord-edp-phy";
+			reg = <0x0 0x0aec5a00 0x0 0x200>,
+			      <0x0 0x0aec5200 0x0 0x0d0>,
+			      <0x0 0x0aec5600 0x0 0x0d0>,
+			      <0x0 0x0aec5000 0x0 0x1c8>;
+
+			clocks = <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_AUX_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>;
+			clock-names = "aux", "cfg_ahb";
+
+			#clock-cells = <1>;
+			#phy-cells = <0>;
+
+			status = "disabled";
+		};
+
+		/*
+		 * DPTX_0: DP controller 0 (SST + up to 4-stream MST).
+		 *
+		 * Base address 0xAF54000 confirmed from IPCAT:
+		 * MDSS_0_DPTX_0_P2CLK @ 0xAF57800 → DPTX_0 base = 0xAF54000.
+		 * Register window sizes follow sa8775p (qcom,sa8775p-dp) since
+		 * Nord uses 4-pixel-stream MST, same as sa8775p.
+		 *
+		 * FIXME(INTR): interrupt index 12 inside MDSS_0 follows the
+		 * sa8775p convention; verify against Nord's MDP IRQ map.
+		 */
+		mdss0_dp0: displayport-controller@af54000 {
+			compatible = "qcom,nord-dp";
+			reg = <0x0 0x0af54000 0x0 0x104>,
+			      <0x0 0x0af54200 0x0 0x0c0>,
+			      <0x0 0x0af55000 0x0 0x770>,
+			      <0x0 0x0af56000 0x0 0x09c>,
+			      <0x0 0x0af57000 0x0 0x09c>,
+			      <0x0 0x0af58000 0x0 0x09c>,
+			      <0x0 0x0af59000 0x0 0x09c>,
+			      <0x0 0x0af5a000 0x0 0x23c>,
+			      <0x0 0x0af5b000 0x0 0x23c>;
+
+			interrupt-parent = <&mdss0>;
+			interrupts = <12>;		/* FIXME(INTR) */
+
+			clocks = <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_LINK_INTF_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK>;
+			clock-names = "core_iface",
+				      "core_aux",
+				      "ctrl_link",
+				      "ctrl_link_iface",
+				      "stream_pixel",
+				      "stream_1_pixel",
+				      "stream_2_pixel",
+				      "stream_3_pixel";
+
+			assigned-clocks = <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK_SRC>;
+			assigned-clock-parents = <&mdss0_dp0_phy 0>,
+						 <&mdss0_dp0_phy 1>,
+						 <&mdss0_dp0_phy 1>,
+						 <&mdss0_dp0_phy 1>,
+						 <&mdss0_dp0_phy 1>;
+
+			/* FIXME(RPMHPD): rpmhpd node not yet in nord.dtsi. */
+			operating-points-v2 = <&dp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+
+			phys = <&mdss0_dp0_phy>;
+			phy-names = "dp";
+
+			#sound-dai-cells = <0>;
+
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					mdss0_dp0_in: endpoint {
+						remote-endpoint = <&dpu0_intf0_out>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+					mdss0_dp0_out: endpoint { };
+				};
+			};
+
+			dp_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-162000000 {
+					opp-hz = /bits/ 64 <162000000>;
+					required-opps = <&rpmhpd_opp_low_svs>;
+				};
+
+				opp-270000000 {
+					opp-hz = /bits/ 64 <270000000>;
+					required-opps = <&rpmhpd_opp_svs>;
+				};
+
+				opp-540000000 {
+					opp-hz = /bits/ 64 <540000000>;
+					required-opps = <&rpmhpd_opp_svs_l1>;
+				};
+
+				opp-810000000 {
+					opp-hz = /bits/ 64 <810000000>;
+					required-opps = <&rpmhpd_opp_nom>;
+				};
+			};
+		};
+
+		/*
+		 * DPTX_1: DP controller 1 (SST + 4-stream MST).
+		 * Base 0xAF5C000 confirmed from IPCAT: DPTX_1_LCLK @ 0xAF5E100.
+		 */
+		mdss0_dp1: displayport-controller@af5c000 {
+			compatible = "qcom,nord-dp";
+			reg = <0x0 0x0af5c000 0x0 0x104>,
+			      <0x0 0x0af5c200 0x0 0x0c0>,
+			      <0x0 0x0af5d000 0x0 0x770>,
+			      <0x0 0x0af5e000 0x0 0x09c>,
+			      <0x0 0x0af5f000 0x0 0x09c>,
+			      <0x0 0x0af60000 0x0 0x09c>,
+			      <0x0 0x0af61000 0x0 0x09c>,
+			      <0x0 0x0af62000 0x0 0x23c>,
+			      <0x0 0x0af63000 0x0 0x23c>;
+
+			interrupt-parent = <&mdss0>;
+			interrupts = <13>;		/* FIXME(INTR) */
+
+			clocks = <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_AUX_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_LINK_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_LINK_INTF_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL0_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL1_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL2_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL3_CLK>;
+			clock-names = "core_iface",
+				      "core_aux",
+				      "ctrl_link",
+				      "ctrl_link_iface",
+				      "stream_pixel",
+				      "stream_1_pixel",
+				      "stream_2_pixel",
+				      "stream_3_pixel";
+
+			assigned-clocks = <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_LINK_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL0_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL1_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL2_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX1_PIXEL3_CLK_SRC>;
+			assigned-clock-parents = <&mdss0_dp1_phy 0>,
+						 <&mdss0_dp1_phy 1>,
+						 <&mdss0_dp1_phy 1>,
+						 <&mdss0_dp1_phy 1>,
+						 <&mdss0_dp1_phy 1>;
+
+			operating-points-v2 = <&dp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+
+			phys = <&mdss0_dp1_phy>;
+			phy-names = "dp";
+
+			#sound-dai-cells = <0>;
+
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					mdss0_dp1_in: endpoint {
+						remote-endpoint = <&dpu0_intf4_out>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+					mdss0_dp1_out: endpoint { };
+				};
+			};
+		};
+
+		/*
+		 * DPTX_2/3 present on MDSS_0 but not wired through the
+		 * DPU catalog's bring-up INTF set. Stubbed for future use.
+		 * Base 0xAF64000 / 0xAF6C000 confirmed from IPCAT.
+		 */
+		mdss0_dp2: displayport-controller@af64000 {
+			compatible = "qcom,nord-dp";
+			/* FIXME(display_bringup): reg/clock/phy TBD; DPTX2 has
+			 * only PIXEL0+1 streams (2-stream MST). Not wired to
+			 * any DPU INTF in the M2 bring-up scope. */
+			status = "disabled";
+		};
+
+		mdss0_dp3: displayport-controller@af6c000 {
+			compatible = "qcom,nord-dp";
+			/* FIXME(display_bringup): DPTX3 is SST-only (one pixel
+			 * stream). Not wired to any DPU INTF in M2 scope. */
+			status = "disabled";
+		};
+	};
+
+	/*
+	 * dispcc0: Display Clock Controller for MDSS_0.
+	 *
+	 * Base 0xAF00000 confirmed from IPCAT:
+	 * MDSS_0_DISP_CC_DISP_CC_DISP_CC_REG @ 0xAF33000 → dispcc0 base
+	 * = 0xAF00000 (consistent with glymur and sa8775p).
+	 *
+	 * Clock bindings from include/dt-bindings/clock/qcom,nord-dispcc.h.
+	 *
+	 * FIXME(display_bringup): "qcom,nord-dispcc0" driver not yet
+	 * authored; temporarily alias from qcom,sa8775p-dispcc0 to boot.
+	 */
+	dispcc0: clock-controller@af00000 {
+		compatible = "qcom,nord-dispcc0";
+		reg = <0x0 0x0af00000 0x0 0x20000>;
+		clocks = <&rpmhcc RPMH_CXO_CLK>,
+			 <&sleep_clk>,
+			 /* FIXME(DP_PHY): PHY clock references pending PHY
+			  * address confirmation. */
+			 <&mdss0_dp0_phy 0>,	/* dptx0 link */
+			 <&mdss0_dp0_phy 1>,	/* dptx0 vco_div */
+			 <&mdss0_dp1_phy 0>,	/* dptx1 link */
+			 <&mdss0_dp1_phy 1>,	/* dptx1 vco_div */
+			 <0>, /* dptx2 — FIXME(DP_PHY) */
+			 <0>,
+			 <0>, /* dptx3 — FIXME(DP_PHY) */
+			 <0>,
+			 <0>, /* dsi0/1 — DSI out of M2 scope */
+			 <0>, <0>, <0>, <0>, <0>, <0>, <0>;
+		/* FIXME(RPMHPD): rpmhpd not yet in nord.dtsi. */
+		power-domains = <&rpmhpd RPMHPD_MMCX>;
+		required-opps = <&rpmhpd_opp_low_svs>;
+
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+		#power-domain-cells = <1>;
+	};
+
+	/*
+	 * MDSS_1: secondary display subsystem.
+	 *
+	 * Base 0x8C00000 derived from IPCAT:
+	 * MDSS_1_MDP @ 0x8C01000 → wrapper at 0x8C00000.
+	 * Interrupt GIC SPI 962 confirmed from IPCAT interrupt map.
+	 *
+	 * This block is intentionally minimal for M2 bringup. Full DP
+	 * controller wiring (DPTX0-3 on 0x8D54000/5C000/64000/6C000)
+	 * is deferred to M3 once MDSS_0 DP stack is validated.
+	 */
+	mdss1: display-subsystem@8c00000 {
+		compatible = "qcom,nord-mdss";
+		reg = <0x0 0x08c00000 0x0 0x1000>;
+		reg-names = "mdss";
+
+		interrupts = <GIC_SPI 962 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+
+		/*
+		 * FIXME(ICC): fabric nodes for MDSS_1 path not yet authored.
+		 * SLAVE_DISPLAY_1_CFG (15) is the config slave for MDSS_1.
+		 */
+		interconnects =
+			/* FIXME(ICC) */ <&mmss_noc MASTER_MDP0 QCOM_ICC_TAG_ALWAYS
+					  &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>,
+			/* FIXME(ICC) */ <&mmss_noc MASTER_MDP1 QCOM_ICC_TAG_ALWAYS
+					  &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>,
+			/* FIXME(ICC) */ <&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
+					  &config_noc SLAVE_DISPLAY_1_CFG QCOM_ICC_TAG_ACTIVE_ONLY>;
+		interconnect-names = "mdp0-mem", "mdp1-mem", "cpu-cfg";
+
+		resets = <&dispcc1 MDSS_DISP_CC_MDSS_CORE_BCR>;
+		power-domains = <&dispcc1 MDSS_DISP_CC_MDSS_CORE_GDSC>;
+
+		clocks = <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+			 <&dispcc1 MDSS_DISP_CC_MDSS_MDP_CLK>;
+		clock-names = "iface", "core";
+
+		/* FIXME(SMMU_SID) */
+		iommus = <&apps_smmu_0 0xffff 0x2>;
+
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		status = "disabled";
+
+		mdss1_mdp: display-controller@8c01000 {
+			compatible = "qcom,nord-dpu";
+			/*
+			 * MDP base confirmed: MDSS_1_MDP @ 0x8C01000 (IPCAT).
+			 * VBIF at 0x8CB0000 by analogy with MDSS_0 offset pattern.
+			 */
+			reg = <0x0 0x08c01000 0x0 0x8f000>,
+			      <0x0 0x08cb0000 0x0 0x3000>;
+			reg-names = "mdp", "vbif";
+
+			interrupt-parent = <&mdss1>;
+			interrupts = <0>;
+
+			clocks = <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_MDP_LUT_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_MDP_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_VSYNC_CLK>;
+			clock-names = "iface", "lut", "core", "vsync";
+
+			assigned-clocks = <&dispcc1 MDSS_DISP_CC_MDSS_VSYNC_CLK>;
+			assigned-clock-rates = <19200000>;
+
+			operating-points-v2 = <&mdss0_mdp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/* FIXME(display_bringup): INTF→DP port mapping for
+				 * MDSS_1 not yet validated; placeholder only. */
+				port@0 {
+					reg = <0>;
+					dpu1_intf0_out: endpoint {
+						remote-endpoint = <&mdss1_dp0_in>;
+					};
+				};
+
+				port@4 {
+					reg = <4>;
+					dpu1_intf4_out: endpoint {
+						remote-endpoint = <&mdss1_dp1_in>;
+					};
+				};
+			};
+		};
+
+		/* FIXME(DP_PHY): MDSS_1 eDP PHY addresses unconfirmed.
+		 * Placeholder uses lemans-pattern offset (MDSS1_base + 0xC2A00). */
+		mdss1_dp0_phy: phy@8cc2a00 {		/* FIXME(DP_PHY) */
+			compatible = "qcom,nord-edp-phy";
+			reg = <0x0 0x08cc2a00 0x0 0x200>,
+			      <0x0 0x08cc2200 0x0 0x0d0>,
+			      <0x0 0x08cc2600 0x0 0x0d0>,
+			      <0x0 0x08cc2000 0x0 0x1c8>;
+			clocks = <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>;
+			clock-names = "aux", "cfg_ahb";
+			#clock-cells = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		mdss1_dp1_phy: phy@8cc5a00 {		/* FIXME(DP_PHY) */
+			compatible = "qcom,nord-edp-phy";
+			reg = <0x0 0x08cc5a00 0x0 0x200>,
+			      <0x0 0x08cc5200 0x0 0x0d0>,
+			      <0x0 0x08cc5600 0x0 0x0d0>,
+			      <0x0 0x08cc5000 0x0 0x1c8>;
+			clocks = <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_AUX_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>;
+			clock-names = "aux", "cfg_ahb";
+			#clock-cells = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		/* DPTX_0: MDSS_1 DP controller 0; base confirmed from IPCAT. */
+		mdss1_dp0: displayport-controller@8d54000 {
+			compatible = "qcom,nord-dp";
+			reg = <0x0 0x08d54000 0x0 0x104>,
+			      <0x0 0x08d54200 0x0 0x0c0>,
+			      <0x0 0x08d55000 0x0 0x770>,
+			      <0x0 0x08d56000 0x0 0x09c>,
+			      <0x0 0x08d57000 0x0 0x09c>,
+			      <0x0 0x08d58000 0x0 0x09c>,
+			      <0x0 0x08d59000 0x0 0x09c>,
+			      <0x0 0x08d5a000 0x0 0x23c>,
+			      <0x0 0x08d5b000 0x0 0x23c>;
+			interrupt-parent = <&mdss1>;
+			interrupts = <12>;		/* FIXME(INTR) */
+			clocks = <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_LINK_INTF_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK>;
+			clock-names = "core_iface", "core_aux", "ctrl_link",
+				      "ctrl_link_iface", "stream_pixel",
+				      "stream_1_pixel", "stream_2_pixel",
+				      "stream_3_pixel";
+			assigned-clocks = <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK_SRC>;
+			assigned-clock-parents = <&mdss1_dp0_phy 0>,
+						 <&mdss1_dp0_phy 1>,
+						 <&mdss1_dp0_phy 1>,
+						 <&mdss1_dp0_phy 1>,
+						 <&mdss1_dp0_phy 1>;
+			operating-points-v2 = <&dp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+			phys = <&mdss1_dp0_phy>;
+			phy-names = "dp";
+			#sound-dai-cells = <0>;
+			status = "disabled";
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				port@0 {
+					reg = <0>;
+					mdss1_dp0_in: endpoint {
+						remote-endpoint = <&dpu1_intf0_out>;
+					};
+				};
+				port@1 {
+					reg = <1>;
+					mdss1_dp0_out: endpoint { };
+				};
+			};
+		};
+
+		/* DPTX_1: MDSS_1 DP controller 1; base confirmed from IPCAT. */
+		mdss1_dp1: displayport-controller@8d5c000 {
+			compatible = "qcom,nord-dp";
+			reg = <0x0 0x08d5c000 0x0 0x104>,
+			      <0x0 0x08d5c200 0x0 0x0c0>,
+			      <0x0 0x08d5d000 0x0 0x770>,
+			      <0x0 0x08d5e000 0x0 0x09c>,
+			      <0x0 0x08d5f000 0x0 0x09c>,
+			      <0x0 0x08d60000 0x0 0x09c>,
+			      <0x0 0x08d61000 0x0 0x09c>,
+			      <0x0 0x08d62000 0x0 0x23c>,
+			      <0x0 0x08d63000 0x0 0x23c>;
+			interrupt-parent = <&mdss1>;
+			interrupts = <13>;		/* FIXME(INTR) */
+			clocks = <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_AUX_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_LINK_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_LINK_INTF_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_PIXEL0_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_PIXEL1_CLK>;
+			clock-names = "core_iface", "core_aux", "ctrl_link",
+				      "ctrl_link_iface", "stream_pixel",
+				      "stream_1_pixel";
+			assigned-clocks = <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_LINK_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_PIXEL0_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX1_PIXEL1_CLK_SRC>;
+			assigned-clock-parents = <&mdss1_dp1_phy 0>,
+						 <&mdss1_dp1_phy 1>,
+						 <&mdss1_dp1_phy 1>;
+			operating-points-v2 = <&dp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+			phys = <&mdss1_dp1_phy>;
+			phy-names = "dp";
+			#sound-dai-cells = <0>;
+			status = "disabled";
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				port@0 {
+					reg = <0>;
+					mdss1_dp1_in: endpoint {
+						remote-endpoint = <&dpu1_intf4_out>;
+					};
+				};
+				port@1 {
+					reg = <1>;
+					mdss1_dp1_out: endpoint { };
+				};
+			};
+		};
+
+		/* DPTX_2/3 on MDSS_1 — base addresses confirmed from IPCAT. */
+		mdss1_dp2: displayport-controller@8d64000 {
+			compatible = "qcom,nord-dp";
+			/* FIXME(display_bringup): M2 scope excludes MDSS_1 DPTX2/3. */
+			status = "disabled";
+		};
+
+		mdss1_dp3: displayport-controller@8d6c000 {
+			compatible = "qcom,nord-dp";
+			/* FIXME(display_bringup): M2 scope excludes MDSS_1 DPTX3. */
+			status = "disabled";
+		};
+	};
+
+	/*
+	 * dispcc1: Display Clock Controller for MDSS_1.
+	 *
+	 * Base 0x8CF0000 confirmed from IPCAT:
+	 * MDSS_1_DISP_CC_DISP_CC_DISP_CC_REG @ 0x8CF1000 → base 0x8CF0000.
+	 */
+	dispcc1: clock-controller@8cf0000 {
+		compatible = "qcom,nord-dispcc1";
+		reg = <0x0 0x08cf0000 0x0 0x20000>;
+		clocks = <&rpmhcc RPMH_CXO_CLK>,
+			 <&sleep_clk>,
+			 <&mdss1_dp0_phy 0>,	/* dptx0 link — FIXME(DP_PHY) */
+			 <&mdss1_dp0_phy 1>,
+			 <&mdss1_dp1_phy 0>,	/* dptx1 link — FIXME(DP_PHY) */
+			 <&mdss1_dp1_phy 1>,
+			 <0>, <0>,		/* dptx2 — FIXME(DP_PHY) */
+			 <0>, <0>,		/* dptx3 — FIXME(DP_PHY) */
+			 <0>, <0>, <0>, <0>, <0>, <0>, <0>, <0>;
+		power-domains = <&rpmhpd RPMHPD_MMCX>;
+		required-opps = <&rpmhpd_opp_low_svs>;
+
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+		#power-domain-cells = <1>;
+	};
+};

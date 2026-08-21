@@ -9,6 +9,7 @@
 #include <dt-bindings/soc/qcom,gpr.h>
 
 #include "nord-ipcc.h"
+#include "nord-display.dtsi"
 
 / {
 	interrupt-parent = <&intc>;
