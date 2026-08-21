@@ -234,3 +234,25 @@
 &ufs_mem_hc {
 	status = "okay";
 };
+
+/* IQ10 M2 display bringup — MDSS_0 DP0 on Ride board */
+&dispcc0 {
+	status = "okay";
+};
+
+&mdss0 {
+	status = "okay";
+};
+
+&mdss0_mdp {
+	status = "okay";
+};
+
+/* FIXME(display_bringup/DP_PHY): enable after eDP PHY base confirmed. */
+&mdss0_dp0_phy {
+	status = "okay";
+};
+
+&mdss0_dp0 {
+	status = "okay";
+};
