@@ -259,6 +259,8 @@ static const struct of_device_id qcom_ubwc_configs[] __maybe_unused = {
 	{ .compatible = "qcom,msm8976", .data = &no_ubwc_data },
 	{ .compatible = "qcom,msm8996", .data = &msm8998_data },
 	{ .compatible = "qcom,msm8998", .data = &msm8998_data },
+	/* qcom,nord: UBWC_5_0, swizzle=6 -- validated against sm8750_data (reuses the reference chip's struct); an earlier glymur_data (swizzle=0) candidate was superseded by this validation */
+	{ .compatible = "qcom,nord", .data = &sm8750_data, },
 	{ .compatible = "qcom,qcm2290", .data = &qcm2290_data, },
 	{ .compatible = "qcom,qcm6490", .data = &sc7280_data, },
 	{ .compatible = "qcom,qcs8300", .data = &sc8280xp_data, },
