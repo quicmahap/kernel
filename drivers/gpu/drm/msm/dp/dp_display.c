@@ -113,6 +113,21 @@ static const struct msm_dp_desc msm_dp_desc_glymur[] = {
 	{}
 };
 
+/*
+ * FIXME(display_bringup): both physical DP0/DP1 controller io_start
+ * entries are IPCAT/knowledge-base-confirmed and declared here, but only
+ * DP0 (MSM_DP_CONTROLLER_0) has a corresponding DT node (mdss0_dp0) in
+ * this bring-up pass -- DP1's DT node is not yet defined, and MDSS_1
+ * (the chip's second, independent MDSS/DISP_CC domain) is out of scope
+ * entirely; see the bring-up notes on the mdss1 node in
+ * arch/arm64/boot/dts/qcom/nord-display.dtsi for the current status.
+ */
+static const struct msm_dp_desc msm_dp_desc_nord[] = {
+	{ .io_start = 0x0af54000, .id = MSM_DP_CONTROLLER_0, .wide_bus_supported = true },
+	{ .io_start = 0x0af5c000, .id = MSM_DP_CONTROLLER_1, .wide_bus_supported = true },
+	{}
+};
+
 static const struct msm_dp_desc msm_dp_desc_sa8775p[] = {
 	{ .io_start = 0x0af54000, .id = MSM_DP_CONTROLLER_0, .wide_bus_supported = true },
 	{ .io_start = 0x0af5c000, .id = MSM_DP_CONTROLLER_1, .wide_bus_supported = true },
@@ -171,6 +186,7 @@ static const struct msm_dp_desc msm_dp_desc_x1e80100[] = {
 
 static const struct of_device_id msm_dp_dt_match[] = {
 	{ .compatible = "qcom,glymur-dp", .data = &msm_dp_desc_glymur },
+	{ .compatible = "qcom,nord-dp", .data = &msm_dp_desc_nord },
 	{ .compatible = "qcom,sa8775p-dp", .data = &msm_dp_desc_sa8775p },
 	{ .compatible = "qcom,sc7180-dp", .data = &msm_dp_desc_sc7180 },
 	{ .compatible = "qcom,sc7280-dp", .data = &msm_dp_desc_sc7280 },
