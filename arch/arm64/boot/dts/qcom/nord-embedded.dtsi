@@ -1278,6 +1278,341 @@
 		#power-domain-cells = <1>;
 	};
 
+	mdss1: display-subsystem@8c00000 {
+		compatible = "qcom,nord-mdss";
+		reg = <0x0 0x08c00000 0x0 0x1000>;
+		reg-names = "mdss";
+
+		power-domains = <&dispcc1 MDSS_DISP_CC_MDSS_CORE_GDSC>;
+		clocks = <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+			 <&nwgcc NW_GCC_DISP_1_HF_AXI_CLK>,
+			 <&dispcc1 MDSS_DISP_CC_MDSS_MDP_CLK>;
+
+		resets = <&dispcc1 MDSS_DISP_CC_MDSS_CORE_BCR>;
+		interconnects = <&mmss_noc MASTER_MDP0 QCOM_ICC_TAG_ALWAYS
+				 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>,
+				<&hscnoc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
+				 &config_noc SLAVE_DISPLAY_CFG QCOM_ICC_TAG_ACTIVE_ONLY>;
+		interconnect-names = "mdp0-mem", "cpu-cfg";
+
+		interrupts = <GIC_SPI 931 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+
+		/* FIXME: MDSS_1 SMMU SID not confirmed by knowledge base; reusing MDSS_0's
+		 * SID (0x3e0) as a placeholder pending SMMU team confirmation. Distinct
+		 * MDSS instances should not share a context bank SID in real silicon.
+		 */
+		iommus = <&apps_smmu_1 0x3e0 0x20000>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		status = "disabled";
+
+		mdss1_mdp: display-controller@8c01000 {
+			compatible = "qcom,nord-dpu";
+			reg = <0x0 0x0ac01000 0x0 0x8f000>,
+			      <0x0 0x0ac90000 0x0 0x3000>;
+			reg-names = "mdp", "vbif";
+
+			clocks = <&nwgcc NW_GCC_DISP_1_HF_AXI_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_MDP_LUT_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_MDP_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_VSYNC_CLK>;
+			clock-names = "nrt_bus", "iface", "lut", "core", "vsync";
+
+			operating-points-v2 = <&mdp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+
+			interrupt-parent = <&mdss1>;
+			interrupts = <0>;
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					dpu1_intf0_out: endpoint {
+						remote-endpoint = <&mdss1_dp0_in>;
+					};
+				};
+			};
+		};
+
+		dp1_phy: phy@aac2a00 {
+			compatible = "qcom,nord-dp-phy";
+
+			reg = <0x0 0x0aac2a00 0x0 0x200>,
+			      <0x0 0x0aac2200 0x0 0xd0>,
+			      <0x0 0x0aac2600 0x0 0xd0>,
+			      <0x0 0x0aac2000 0x0 0x1c8>;
+
+			clocks = <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&tcsrcc TCSR_DP_TX_1_CLKREF_EN>;
+			clock-names = "aux", "cfg_ahb", "ref";
+
+			#clock-cells = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		mdss1_dp0: displayport-controller@ad54000 {
+			compatible = "qcom,nord-dp";
+			reg = <0x0 0x0ad54000 0x0 0x200>,
+			      <0x0 0x0ad54200 0x0 0x200>,
+			      <0x0 0x0ad55000 0x0 0xc00>,
+			      <0x0 0x0ad56000 0x0 0x400>,
+			      <0x0 0x0ad57000 0x0 0x400>,
+			      <0x0 0x0ad58000 0x0 0x400>,
+			      <0x0 0x0ad59000 0x0 0x400>,
+			      <0x0 0x0ad5a000 0x0 0x600>,
+			      <0x0 0x0ad5b000 0x0 0x600>;
+
+			clocks = <&dispcc1 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_LINK_INTF_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK>,
+				 <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK>;
+			clock-names = "core_iface", "core_aux", "ctrl_link", "ctrl_link_iface",
+				      "stream_pixel", "stream_1_pixel", "stream_2_pixel",
+				      "stream_3_pixel";
+
+			assigned-clocks = <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK_SRC>,
+					  <&dispcc1 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK_SRC>;
+			assigned-clock-parents = <&dp1_phy 0>, <&dp1_phy 1>, <&dp1_phy 1>,
+						  <&dp1_phy 1>, <&dp1_phy 1>;
+
+			interrupts-extended = <&mdss1 12>;
+			phys = <&dp1_phy>;
+			phy-names = "dp";
+
+			operating-points-v2 = <&dp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+			#sound-dai-cells = <0>;
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					mdss1_dp0_in: endpoint {
+						remote-endpoint = <&dpu1_intf0_out>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+					mdss1_dp0_out: endpoint {
+					};
+				};
+			};
+		};
+	};
+
+	mdp_opp_table: opp-table {
+		compatible = "operating-points-v2";
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+			required-opps = <&rpmhpd_opp_svs>;
+		};
+
+		opp-417000000 {
+			opp-hz = /bits/ 64 <417000000>;
+			required-opps = <&rpmhpd_opp_svs_l1>;
+		};
+
+		opp-532000000 {
+			opp-hz = /bits/ 64 <532000000>;
+			required-opps = <&rpmhpd_opp_nom>;
+		};
+
+		opp-650000000 {
+			opp-hz = /bits/ 64 <650000000>;
+			required-opps = <&rpmhpd_opp_turbo>;
+		};
+
+		opp-710000000 {
+			opp-hz = /bits/ 64 <710000000>;
+			required-opps = <&rpmhpd_opp_turbo_l1>;
+		};
+	};
+
+	dp_opp_table: opp-table {
+		compatible = "operating-points-v2";
+
+		opp-162000000 {
+			opp-hz = /bits/ 64 <162000000>;
+			required-opps = <&rpmhpd_opp_low_svs>;
+		};
+
+		opp-270000000 {
+			opp-hz = /bits/ 64 <270000000>;
+			required-opps = <&rpmhpd_opp_low_svs>;
+		};
+
+		opp-540000000 {
+			opp-hz = /bits/ 64 <540000000>;
+			required-opps = <&rpmhpd_opp_svs_l1>;
+		};
+
+		opp-810000000 {
+			opp-hz = /bits/ 64 <810000000>;
+			required-opps = <&rpmhpd_opp_nom>;
+		};
+	};
+
+	mdss0: display-subsystem@ae00000 {
+		compatible = "qcom,nord-mdss";
+		reg = <0x0 0x0ae00000 0x0 0x1000>;
+		reg-names = "mdss";
+
+		power-domains = <&dispcc0 MDSS_DISP_CC_MDSS_CORE_GDSC>;
+		clocks = <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+			 <&nwgcc NW_GCC_DISP_0_HF_AXI_CLK>,
+			 <&dispcc0 MDSS_DISP_CC_MDSS_MDP_CLK>;
+
+		resets = <&dispcc0 MDSS_DISP_CC_MDSS_CORE_BCR>;
+		interconnects = <&mmss_noc MASTER_MDP0 QCOM_ICC_TAG_ALWAYS
+				 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>,
+				<&hscnoc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
+				 &config_noc SLAVE_DISPLAY_CFG QCOM_ICC_TAG_ACTIVE_ONLY>;
+		interconnect-names = "mdp0-mem", "cpu-cfg";
+
+		interrupts = <GIC_SPI 930 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+
+		iommus = <&apps_smmu_1 0x3e0 0x20000>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		status = "disabled";
+
+		mdss0_mdp: display-controller@ae01000 {
+			compatible = "qcom,nord-dpu";
+			reg = <0x0 0x0ae01000 0x0 0x8f000>,
+			      <0x0 0x0aeb0000 0x0 0x3000>;
+			reg-names = "mdp", "vbif";
+
+			clocks = <&nwgcc NW_GCC_DISP_0_HF_AXI_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_MDP_LUT_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_MDP_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_VSYNC_CLK>;
+			clock-names = "nrt_bus", "iface", "lut", "core", "vsync";
+
+			operating-points-v2 = <&mdp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+
+			interrupt-parent = <&mdss0>;
+			interrupts = <0>;
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					dpu_intf0_out: endpoint {
+						remote-endpoint = <&mdss0_dp0_in>;
+					};
+				};
+			};
+		};
+
+		dp0_phy: phy@aec2a00 {
+			compatible = "qcom,nord-dp-phy";
+
+			reg = <0x0 0x0aec2a00 0x0 0x200>,
+			      <0x0 0x0aec2200 0x0 0xd0>,
+			      <0x0 0x0aec2600 0x0 0xd0>,
+			      <0x0 0x0aec2000 0x0 0x1c8>;
+
+			clocks = <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&tcsrcc TCSR_DP_TX_0_CLKREF_EN>;
+			clock-names = "aux", "cfg_ahb", "ref";
+
+			#clock-cells = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		mdss0_dp0: displayport-controller@af54000 {
+			compatible = "qcom,nord-dp";
+			reg = <0x0 0x0af54000 0x0 0x200>,
+			      <0x0 0x0af54200 0x0 0x200>,
+			      <0x0 0x0af55000 0x0 0xc00>,
+			      <0x0 0x0af56000 0x0 0x400>,
+			      <0x0 0x0af57000 0x0 0x400>,
+			      <0x0 0x0af58000 0x0 0x400>,
+			      <0x0 0x0af59000 0x0 0x400>,
+			      <0x0 0x0af5a000 0x0 0x600>,
+			      <0x0 0x0af5b000 0x0 0x600>;
+
+			clocks = <&dispcc0 MDSS_DISP_CC_MDSS_AHB_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_AUX_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_LINK_INTF_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK>,
+				 <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK>;
+			clock-names = "core_iface", "core_aux", "ctrl_link", "ctrl_link_iface",
+				      "stream_pixel", "stream_1_pixel", "stream_2_pixel",
+				      "stream_3_pixel";
+
+			assigned-clocks = <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_LINK_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL0_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL1_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL2_CLK_SRC>,
+					  <&dispcc0 MDSS_DISP_CC_MDSS_DPTX0_PIXEL3_CLK_SRC>;
+			assigned-clock-parents = <&dp0_phy 0>, <&dp0_phy 1>, <&dp0_phy 1>,
+						  <&dp0_phy 1>, <&dp0_phy 1>;
+
+			interrupts-extended = <&mdss0 12>;
+			phys = <&dp0_phy>;
+			phy-names = "dp";
+
+			operating-points-v2 = <&dp_opp_table>;
+			power-domains = <&rpmhpd RPMHPD_MMCX>;
+			#sound-dai-cells = <0>;
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					mdss0_dp0_in: endpoint {
+						remote-endpoint = <&dpu_intf0_out>;
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+					mdss0_dp0_out: endpoint {
+					};
+				};
+			};
+		};
+	};
+
 	dispcc0: clock-controller@af00000 {
 		compatible = "qcom,nord-dispcc0";
 		reg = <0x0 0x0af00000 0x0 0x20000>;
