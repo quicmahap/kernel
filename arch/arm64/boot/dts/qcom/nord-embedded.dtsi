@@ -20,6 +20,7 @@
 #include <dt-bindings/soc/qcom,rpmh-rsc.h>
 
 #include "nord.dtsi"
+#include "nord-display.dtsi"
 
 / {
 	clk_virt: interconnect-clk-virt {
@@ -1290,8 +1291,8 @@
 			 <0>,
 			 <0>,
 			 <0>,
-			 <0>,
-			 <0>,
+			 <&dp0_phy 0>,
+			 <&dp0_phy 1>,
 			 <0>,
 			 <0>,
 			 <0>,
