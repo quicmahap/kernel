@@ -45,6 +45,13 @@
 
 #define DP_PHY_STATUS                           0x00e0
 
+/*
+ * nordschleife (noard) eDP/DP PHY: DP_PHY_LDO_CFG, consumed by
+ * qcom_edp_ldo_config_noard() -- see nordschleife_dp_phy_description.md
+ * §6 "Validated file-level addition".
+ */
+#define DP_PHY_LDO_CFG                           0x00f0
+
 /* LANE_TXn registers */
 #define TXn_CLKBUF_ENABLE                       0x0000
 #define TXn_TX_EMP_POST1_LVL                    0x0004
@@ -228,6 +235,85 @@ static const struct qcom_edp_swing_pre_emph_cfg edp_phy_swing_pre_emph_cfg = {
 	.pre_emphasis_hbr3_hbr2 = &edp_pre_emp_hbr2_hbr3,
 };
 
+/*
+ * nordschleife (noard) DP-mode swing/pre-emphasis tables, transcribed
+ * verbatim from nordschleife_dp_phy_description.md §4. 0xff sentinels
+ * ("unsupported combination") are preserved as-is.
+ */
+static const u8 noard_dp_swing_hbr_rbr[4][4] = {
+	{ 0x07, 0x0f, 0x16, 0x1f },
+	{ 0x11, 0x1e, 0x1f, 0xff },
+	{ 0x16, 0x1f, 0xff, 0xff },
+	{ 0x1f, 0xff, 0xff, 0xff }
+};
+
+static const u8 noard_dp_swing_hbr2_hbr3[4][4] = {
+	{ 0x02, 0x12, 0x16, 0x1a },
+	{ 0x09, 0x19, 0x1f, 0xff },
+	{ 0x10, 0x1f, 0xff, 0xff },
+	{ 0x1f, 0xff, 0xff, 0xff }
+};
+
+static const u8 noard_dp_pre_emp_hbr_rbr[4][4] = {
+	{ 0x00, 0x0e, 0x15, 0x1a },
+	{ 0x00, 0x0e, 0x15, 0xff },
+	{ 0x00, 0x0e, 0xff, 0xff },
+	{ 0x02, 0xff, 0xff, 0xff }
+};
+
+static const u8 noard_dp_pre_emp_hbr2_hbr3[4][4] = {
+	{ 0x00, 0x0c, 0x15, 0x1b },
+	{ 0x02, 0x0e, 0x16, 0xff },
+	{ 0x02, 0x11, 0xff, 0xff },
+	{ 0x04, 0xff, 0xff, 0xff }
+};
+
+static const struct qcom_edp_swing_pre_emph_cfg noard_dp_swing_pre_emph_cfg = {
+	.swing_hbr_rbr = &noard_dp_swing_hbr_rbr,
+	.swing_hbr3_hbr2 = &noard_dp_swing_hbr2_hbr3,
+	.pre_emphasis_hbr_rbr = &noard_dp_pre_emp_hbr_rbr,
+	.pre_emphasis_hbr3_hbr2 = &noard_dp_pre_emp_hbr2_hbr3,
+};
+
+/*
+ * nordschleife (noard) eDP-mode swing/pre-emphasis tables, transcribed
+ * verbatim from nordschleife_dp_phy_description.md §5.
+ */
+static const u8 noard_edp_swing_hbr_rbr[4][4] = {
+	{ 0x07, 0x0f, 0x14, 0x1a },
+	{ 0x11, 0x1c, 0x1f, 0xff },
+	{ 0x19, 0x1f, 0xff, 0xff },
+	{ 0x1f, 0xff, 0xff, 0xff }
+};
+
+static const u8 noard_edp_swing_hbr2_hbr3[4][4] = {
+	{ 0x02, 0x12, 0x16, 0x1a },
+	{ 0x09, 0x19, 0x1f, 0xff },
+	{ 0x10, 0x1f, 0xff, 0xff },
+	{ 0x1f, 0xff, 0xff, 0xff }
+};
+
+static const u8 noard_edp_pre_emp_hbr_rbr[4][4] = {
+	{ 0x00, 0x0d, 0x15, 0x1a },
+	{ 0x00, 0x0e, 0x15, 0xff },
+	{ 0x00, 0x0e, 0xff, 0xff },
+	{ 0x03, 0xff, 0xff, 0xff }
+};
+
+static const u8 noard_edp_pre_emp_hbr2_hbr3[4][4] = {
+	{ 0x00, 0x0c, 0x15, 0x1b },
+	{ 0x02, 0x0e, 0x16, 0xff },
+	{ 0x02, 0x11, 0xff, 0xff },
+	{ 0x04, 0xff, 0xff, 0xff }
+};
+
+static const struct qcom_edp_swing_pre_emph_cfg noard_edp_swing_pre_emph_cfg = {
+	.swing_hbr_rbr = &noard_edp_swing_hbr_rbr,
+	.swing_hbr3_hbr2 = &noard_edp_swing_hbr2_hbr3,
+	.pre_emphasis_hbr_rbr = &noard_edp_pre_emp_hbr_rbr,
+	.pre_emphasis_hbr3_hbr2 = &noard_edp_pre_emp_hbr2_hbr3,
+};
+
 static const u8 edp_phy_aux_cfg_v4[DP_AUX_CFG_SIZE] = {
 	0x00, 0x13, 0x24, 0x00, 0x0a, 0x26, 0x0a, 0x03, 0x37, 0x03, 0x02, 0x02, 0x00,
 };
@@ -290,6 +376,28 @@ static const u8 edp_phy_vco_div_cfg_v8[4] = {
 	0x00, 0x00, 0x02, 0x01,
 };
 
+/*
+ * nordschleife (noard) AUX config, transcribed verbatim from
+ * nordschleife_dp_phy_description.md §2. Index 8 (0x37) is the eDP-mode
+ * default; qcom_edp_phy_init() overrides it to 0xb7 at runtime for DP
+ * submode (!edp->is_edp), same as every other compatible in this driver.
+ */
+static const u8 edp_phy_aux_cfg_noard[DP_AUX_CFG_SIZE] = {
+	0x00, 0x13, 0xa4, 0x01, 0x0a, 0x26, 0x0a, 0x03, 0x37, 0x03, 0x02, 0x02, 0x04,
+};
+
+/*
+ * nordschleife (noard) VCO_DIV per link rate, transcribed verbatim from
+ * nordschleife_dp_phy_description.md §3 (Nominal/Turbo column). HPG Table
+ * 2-1-d documents 12 link rates in total; the 8 UHBR/LPBR rates beyond
+ * 1620/2700/5400/8100 have no switch-case in this generation's PLL/SSC/
+ * VCO_DIV code -- see FIXME(display_bringup) on qcom_edp_com_configure_pll_noard()'s
+ * default arm below.
+ */
+static const u8 edp_phy_vco_div_cfg_noard[4] = {
+	0x00, 0x00, 0x02, 0x01,
+};
+
 static int qcom_edp_phy_init(struct phy *phy)
 {
 	struct qcom_edp *edp = phy_get_drvdata(phy);
@@ -306,9 +414,17 @@ static int qcom_edp_phy_init(struct phy *phy)
 
 	memcpy(aux_cfg, edp->cfg->aux_cfg, sizeof(aux_cfg));
 
-	ret = edp->cfg->ver_ops->com_clk_fwd_cfg(edp);
-	if (ret)
-		return ret;
+	/*
+	 * com_clk_fwd_cfg is optional: nordschleife (noard)'s HPG has no
+	 * CLK_FWD_CONFIG_1 sequence and the silicon-validated tree does not
+	 * call it for this PHY at all -- see
+	 * nordschleife_dp_phy_description.md §6.4.
+	 */
+	if (edp->cfg->ver_ops->com_clk_fwd_cfg) {
+		ret = edp->cfg->ver_ops->com_clk_fwd_cfg(edp);
+		if (ret)
+			return ret;
+	}
 
 	writel(DP_PHY_PD_CTL_PWRDN | DP_PHY_PD_CTL_AUX_PWRDN |
 	       DP_PHY_PD_CTL_PLL_PWRDN | DP_PHY_PD_CTL_DP_CLAMP_EN,
@@ -333,6 +449,17 @@ static int qcom_edp_phy_init(struct phy *phy)
 
 	for (int i = 0; i < DP_AUX_CFG_SIZE; i++)
 		writel(aux_cfg[i], edp->edp + DP_PHY_AUX_CFG(i));
+
+	/*
+	 * nordschleife (noard) HPG note: AUX_CFG3 is "programmed twice"
+	 * (0x01, then 0x00). The array above (and the eDP_dp_phy_aux_cfg_noard
+	 * copy in aux_cfg[]) carries the first write; this is the explicit
+	 * second-write override, issued immediately after the table above is
+	 * applied -- see nordschleife_dp_phy_description.md §6 "Validated AUX
+	 * CFG[3] override" and §8.4.
+	 */
+	if (edp->cfg->aux_cfg == edp_phy_aux_cfg_noard)
+		writel(0x00, edp->edp + DP_PHY_AUX_CFG(3));
 
 	writel(PHY_AUX_STOP_ERR_MASK | PHY_AUX_DEC_ERR_MASK |
 	       PHY_AUX_SYNC_ERR_MASK | PHY_AUX_ALIGN_ERR_MASK |
@@ -1089,6 +1216,265 @@ static struct qcom_edp_phy_cfg glymur_phy_cfg = {
 	.ver_ops = &qcom_edp_phy_ops_v8,
 };
 
+/*
+ * nordschleife (noard) dedicated eDP/DP PHY -- v8 register generation,
+ * reusing phy-qcom-qmp-qserdes-com-v4.h/-v6.h + phy-qcom-qmp-dp-phy-v8.h
+ * (no new offset header; Step 1.5 reuse-path per
+ * nordschleife_dp_phy_description.md §1). Every register value below is
+ * transcribed from that file's §6, not borrowed from glymur (used only as
+ * the structural/code-shape reference).
+ *
+ * com_power_on/com_resetsm_cntrl/com_bias_en_clkbuflr below carry HPG
+ * sequences that are byte-for-byte identical to the existing v8
+ * generation's (§6.1-§6.3), but are still kept as their own
+ * nord-specific (validated) functions rather than pointer-aliased to
+ * the v8 ones, per nordschleife_dp_phy_description.md §1 "Ops structure
+ * (validated)" and the §9 artifact table. com_clk_fwd_cfg has no HPG
+ * sequence for nord at all (§6.4) -- the ops struct below leaves it
+ * NULL, and qcom_edp_phy_init() has been made tolerant of a NULL
+ * com_clk_fwd_cfg to support that.
+ */
+static int qcom_edp_phy_power_on_noard(const struct qcom_edp *edp)
+{
+	u32 val;
+
+	writel(DP_PHY_PD_CTL_PWRDN | DP_PHY_PD_CTL_AUX_PWRDN |
+	       DP_PHY_PD_CTL_LANE_0_1_PWRDN | DP_PHY_PD_CTL_LANE_2_3_PWRDN |
+	       DP_PHY_PD_CTL_PLL_PWRDN | DP_PHY_PD_CTL_DP_CLAMP_EN,
+	       edp->edp + DP_PHY_PD_CTL);
+	writel(0xfc, edp->edp + DP_PHY_MODE);
+
+	return readl_poll_timeout(edp->pll + DP_QSERDES_V8_COM_CMN_STATUS,
+				     val, val & BIT(7), 5, 200);
+}
+
+static int qcom_edp_phy_com_resetsm_cntrl_noard(const struct qcom_edp *edp)
+{
+	u32 val;
+
+	writel(0x20, edp->pll + DP_QSERDES_V8_COM_RESETSM_CNTRL);
+
+	return readl_poll_timeout(edp->pll + DP_QSERDES_V8_COM_C_READY_STATUS,
+				     val, val & BIT(0), 500, 10000);
+}
+
+static int qcom_edp_com_bias_en_clkbuflr_noard(const struct qcom_edp *edp)
+{
+	/* Turn on BIAS current for PHY/PLL */
+	writel(0x1f, edp->pll + DP_QSERDES_V8_COM_BIAS_EN_CLKBUFLR_EN);
+
+	return 0;
+}
+
+static int qcom_edp_com_configure_ssc_noard(const struct qcom_edp *edp)
+{
+	const struct phy_configure_opts_dp *dp_opts = &edp->dp_opts;
+	u32 step1;
+	u32 step2;
+
+	switch (dp_opts->link_rate) {
+	case 1620:
+		step1 = 0x83;
+		step2 = 0x02;
+		break;
+
+	case 2700:
+	case 5400:
+		step1 = 0x18;
+		step2 = 0x02;
+		break;
+
+	case 8100:
+		step1 = 0x5b;
+		step2 = 0x02;
+		break;
+
+	default:
+		/* Other link rates aren't supported */
+		return -EINVAL;
+	}
+
+	writel(0x01, edp->pll + DP_QSERDES_V8_COM_SSC_EN_CENTER);
+	writel(0x00, edp->pll + DP_QSERDES_V8_COM_SSC_ADJ_PER1);
+	writel(0x6b, edp->pll + DP_QSERDES_V8_COM_SSC_PER1);
+	writel(0x02, edp->pll + DP_QSERDES_V8_COM_SSC_PER2);
+	writel(step1, edp->pll + DP_QSERDES_V8_COM_SSC_STEP_SIZE1_MODE0);
+	writel(step2, edp->pll + DP_QSERDES_V8_COM_SSC_STEP_SIZE2_MODE0);
+
+	return 0;
+}
+
+static int qcom_edp_com_configure_pll_noard(const struct qcom_edp *edp)
+{
+	const struct phy_configure_opts_dp *dp_opts = &edp->dp_opts;
+	u32 div_frac_start2_mode0;
+	u32 div_frac_start3_mode0;
+	u32 dec_start_mode0;
+	u32 lock_cmp1_mode0;
+	u32 lock_cmp2_mode0;
+	u32 lock_cmp_en;
+	u32 code1_mode0;
+	u32 code2_mode0;
+	u32 hsclk_sel;
+
+	switch (dp_opts->link_rate) {
+	case 1620:
+		hsclk_sel = 0x0c;
+		dec_start_mode0 = 0x69;
+		div_frac_start2_mode0 = 0x80;
+		div_frac_start3_mode0 = 0x07;
+		lock_cmp1_mode0 = 0x6f;
+		lock_cmp2_mode0 = 0x08;
+		lock_cmp_en = 0x00;
+		code1_mode0 = 0x02;
+		code2_mode0 = 0x22;
+		break;
+
+	case 2700:
+		hsclk_sel = 0x04;
+		dec_start_mode0 = 0x46;
+		div_frac_start2_mode0 = 0x00;
+		div_frac_start3_mode0 = 0x05;
+		lock_cmp1_mode0 = 0x07;
+		lock_cmp2_mode0 = 0x07;
+		lock_cmp_en = 0x08;
+		code1_mode0 = 0xf6;
+		code2_mode0 = 0x20;
+		break;
+
+	case 5400:
+		hsclk_sel = 0x01;
+		dec_start_mode0 = 0x46;
+		div_frac_start2_mode0 = 0x00;
+		div_frac_start3_mode0 = 0x05;
+		lock_cmp1_mode0 = 0x0f;
+		lock_cmp2_mode0 = 0x0e;
+		lock_cmp_en = 0x08;
+		code1_mode0 = 0xf6;
+		code2_mode0 = 0x20;
+		break;
+
+	case 8100:
+		hsclk_sel = 0x03;
+		dec_start_mode0 = 0x4f;
+		div_frac_start2_mode0 = 0xa0;
+		div_frac_start3_mode0 = 0x01;
+		lock_cmp1_mode0 = 0x17;
+		lock_cmp2_mode0 = 0x15;
+		lock_cmp_en = 0x08;
+		code1_mode0 = 0x14;
+		code2_mode0 = 0x25;
+		break;
+
+	default:
+		/*
+		 * Other link rates aren't supported.
+		 *
+		 * FIXME(display_bringup): HPG_RATE_GAP -- HPG Table 2-1-d
+		 * documents 8 additional rates (UHBR 10/13.5/20 and LPBR
+		 * 6750/4320/3240/2430/2160 kbps) with their own PLL/VCO_DIV
+		 * constants, but this generation's PLL/SSC/VCO_DIV switches
+		 * only cover the 4 DP-standard rates below. See
+		 * nordschleife_dp_phy_description.md §7.1.
+		 */
+		return -EINVAL;
+	}
+
+	writel(0x01, edp->pll + DP_QSERDES_V8_COM_SVS_MODE_CLK_SEL);
+	writel(0x0b, edp->pll + DP_QSERDES_V8_COM_SYSCLK_EN_SEL);
+	writel(0x02, edp->pll + DP_QSERDES_V8_COM_SYS_CLK_CTRL);
+	writel(0x0c, edp->pll + DP_QSERDES_V8_COM_CLK_ENABLE1);
+	writel(0x06, edp->pll + DP_QSERDES_V8_COM_SYSCLK_BUF_ENABLE);
+	writel(0x30, edp->pll + DP_QSERDES_V8_COM_CLK_SELECT);
+	writel(hsclk_sel, edp->pll + DP_QSERDES_V8_COM_HSCLK_SEL_1);
+	writel(0x07, edp->pll + DP_QSERDES_V8_COM_PLL_IVCO);
+	writel(lock_cmp_en, edp->pll + DP_QSERDES_V8_COM_LOCK_CMP_EN);
+	writel(0x36, edp->pll + DP_QSERDES_V8_COM_PLL_CCTRL_MODE0);
+	writel(0x16, edp->pll + DP_QSERDES_V8_COM_PLL_RCTRL_MODE0);
+	writel(0x06, edp->pll + DP_QSERDES_V8_COM_CP_CTRL_MODE0);
+	writel(dec_start_mode0, edp->pll + DP_QSERDES_V8_COM_DEC_START_MODE0);
+	writel(0x00, edp->pll + DP_QSERDES_V8_COM_DIV_FRAC_START1_MODE0);
+	writel(div_frac_start2_mode0, edp->pll + DP_QSERDES_V8_COM_DIV_FRAC_START2_MODE0);
+	writel(div_frac_start3_mode0, edp->pll + DP_QSERDES_V8_COM_DIV_FRAC_START3_MODE0);
+	writel(0x12, edp->pll + DP_QSERDES_V8_COM_CMN_CONFIG_1);
+	writel(0x3f, edp->pll + DP_QSERDES_V8_COM_INTEGLOOP_GAIN0_MODE0);
+	writel(0x00, edp->pll + DP_QSERDES_V8_COM_INTEGLOOP_GAIN1_MODE0);
+	writel(0x00, edp->pll + DP_QSERDES_V8_COM_VCO_TUNE_MAP);
+	writel(lock_cmp1_mode0, edp->pll + DP_QSERDES_V8_COM_LOCK_CMP1_MODE0);
+	writel(lock_cmp2_mode0, edp->pll + DP_QSERDES_V8_COM_LOCK_CMP2_MODE0);
+
+	writel(0x0a, edp->pll + DP_QSERDES_V8_COM_BG_TIMER);
+	writel(0x14, edp->pll + DP_QSERDES_V8_COM_CORECLK_DIV_MODE0);
+	writel(0x00, edp->pll + DP_QSERDES_V8_COM_VCO_TUNE_CTRL);
+	/* HPG note: "May be 0x17" -- driver uses 0x1f, per silicon validation */
+	writel(0x1f, edp->pll + DP_QSERDES_V8_COM_BIAS_EN_CLKBUFLR_EN);
+	writel(0x0f, edp->pll + DP_QSERDES_V8_COM_CORE_CLK_EN);
+
+	writel(code1_mode0, edp->pll + DP_QSERDES_V8_COM_BIN_VCOCAL_CMP_CODE1_MODE0);
+	writel(code2_mode0, edp->pll + DP_QSERDES_V8_COM_BIN_VCOCAL_CMP_CODE2_MODE0);
+
+	return 0;
+}
+
+static int qcom_edp_ldo_config_noard(const struct qcom_edp *edp)
+{
+	const struct phy_configure_opts_dp *dp_opts = &edp->dp_opts;
+	u32 ldo_config;
+	u32 phy_ldo_cfg;
+
+	/*
+	 * HPG rev D §2.7.3 "NordAU Correct LDO Config Description" -- the
+	 * HPG explicitly notes IPCAT/SWI's LDO description is incorrect;
+	 * these are the corrected rev-D values.
+	 */
+	if (!edp->is_edp) {
+		ldo_config = 0x00;
+		phy_ldo_cfg = 0x00;
+	} else {
+		ldo_config = 0xd1;
+		phy_ldo_cfg = 0x03;
+	}
+
+	writel(ldo_config, edp->tx0 + TXn_LDO_CONFIG);
+	writel(dp_opts->lanes > 2 ? ldo_config : 0x00, edp->tx1 + TXn_LDO_CONFIG);
+	writel(phy_ldo_cfg, edp->edp + DP_PHY_LDO_CFG);
+
+	return 0;
+}
+
+/*
+ * FIXME(display_bringup): FEATURE_GAP -- HPG describes "Auxless Wake
+ * Operation", "Multi-Lane operation during Auxless" and "Glymur DP PHY
+ * Bonding" for this PHY generation, none of which have a corresponding
+ * struct phy_ver_ops hook today. Not implemented; out of scope for this
+ * bring-up. See nordschleife_dp_phy_description.md §7.2.
+ */
+static const struct phy_ver_ops qcom_edp_phy_ops_noard = {
+	.com_power_on		= qcom_edp_phy_power_on_noard,
+	.com_resetsm_cntrl	= qcom_edp_phy_com_resetsm_cntrl_noard,
+	.com_bias_en_clkbuflr	= qcom_edp_com_bias_en_clkbuflr_noard,
+	.com_clk_fwd_cfg	= NULL,
+	.com_configure_pll	= qcom_edp_com_configure_pll_noard,
+	.com_configure_ssc	= qcom_edp_com_configure_ssc_noard,
+	.com_ldo_config		= qcom_edp_ldo_config_noard,
+};
+
+/*
+ * Cfg struct name intentionally reproduces the HPG-derived "noard" typo
+ * (transposed a/r from "nord", matching the HPG's own title "(NoardAU)")
+ * -- this is the identifier the in-vehicle silicon validation used. Do
+ * not rename to nord_edp_phy_cfg; see
+ * nordschleife_dp_phy_description.md §8.1.
+ */
+static const struct qcom_edp_phy_cfg noard_edp_phy_cfg = {
+	.is_edp = false,
+	.aux_cfg = edp_phy_aux_cfg_noard,
+	.vco_div_cfg = edp_phy_vco_div_cfg_noard,
+	.dp_swing_pre_emph_cfg = &noard_dp_swing_pre_emph_cfg,
+	.edp_swing_pre_emph_cfg = &noard_edp_swing_pre_emph_cfg,
+	.ver_ops = &qcom_edp_phy_ops_noard,
+};
+
 static int qcom_edp_phy_power_on(struct phy *phy)
 {
 	const struct qcom_edp *edp = phy_get_drvdata(phy);
@@ -1483,6 +1869,7 @@ static int qcom_edp_phy_probe(struct platform_device *pdev)
 
 static const struct of_device_id qcom_edp_phy_match_table[] = {
 	{ .compatible = "qcom,glymur-dp-phy", .data = &glymur_phy_cfg, },
+	{ .compatible = "qcom,nord-dp-phy", .data = &noard_edp_phy_cfg, },
 	{ .compatible = "qcom,sa8775p-edp-phy", .data = &sa8775p_dp_phy_cfg, },
 	{ .compatible = "qcom,sc7280-edp-phy", .data = &sc7280_dp_phy_cfg, },
 	{ .compatible = "qcom,sc8180x-edp-phy", .data = &sc8180x_dp_phy_cfg, },
